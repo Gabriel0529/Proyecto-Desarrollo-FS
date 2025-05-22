@@ -1,0 +1,135 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}Tickets - Sistema de Gestión de Activos{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-md rounded-lg p-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">
+            <i class="fas fa-ticket-alt text-green-600 mr-2"></i>Tickets de Soporte
+            {% if perfil.rol == 'cliente' %}
+                de {{ perfil.empresa.nombre }}
+            {% endif %}
+        </h1>
+        <a href="{% url 'crear_ticket' %}" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition">
+            <i class="fas fa-plus mr-1"></i> Crear Ticket
+        </a>
+    </div>
+
+    <div class="mb-6 flex flex-wrap gap-3">
+        <button class="filter-btn px-3 py-1 rounded-full bg-gray-200 text-gray-800 hover:bg-gray-300 active" data-filter="all">
+            Todos
+        </button>
+        <button class="filter-btn px-3 py-1 rounded-full bg-blue-100 text-blue-800 hover:bg-blue-200" data-filter="abierto">
+            Abiertos
+        </button>
+        <button class="filter-btn px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 hover:bg-yellow-200" data-filter="en_progreso">
+            En Progreso
+        </button>
+        <button class="filter-btn px-3 py-1 rounded-full bg-green-100 text-green-800 hover:bg-green-200" data-filter="cerrado">
+            Cerrados
+        </button>
+    </div>
+
+    {% if tickets %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="tickets-container">
+            {% for ticket in tickets %}
+                <div class="ticket-card bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition duration-300" 
+                     data-estado="{{ ticket.estado }}" data-prioridad="{{ ticket.prioridad }}">
+                    <div class="p-5 {% if ticket.estado == 'abierto' %}border-l-4 border-blue-500{% elif ticket.estado == 'en_progreso' %}border-l-4 border-yellow-500{% else %}border-l-4 border-green-500{% endif %}">
+                        <div class="flex items-start justify-between">
+                            <h3 class="text-lg font-bold text-gray-800 mb-2">{{ ticket.titulo }}</h3>
+                            <div class="flex flex-col gap-1">
+                                <span class="{% if ticket.estado == 'abierto' %}bg-blue-100 text-blue-800{% elif ticket.estado == 'en_progreso' %}bg-yellow-100 text-yellow-800{% else %}bg-green-100 text-green-800{% endif %} text-xs font-medium px-2.5 py-0.5 rounded">
+                                    {{ ticket.estado|capfirst }}
+                                </span>
+                                <span class="{% if ticket.prioridad == 'alta' %}bg-red-100 text-red-800{% elif ticket.prioridad == 'media' %}bg-orange-100 text-orange-800{% else %}bg-gray-100 text-gray-800{% endif %} text-xs font-medium px-2.5 py-0.5 rounded">
+                                    {{ ticket.prioridad|capfirst }}
+                                </span>
+                            </div>
+                        </div>
+                        <p class="text-gray-600 mb-3 line-clamp-2">{{ ticket.descripcion }}</p>
+                        
+                        {% if perfil.rol == 'admin' or perfil.rol == 'tecnico' %}
+                        <div class="flex items-center mb-3 text-sm">
+                            <i class="fas fa-building text-gray-500 mr-1"></i>
+                            <span class="text-gray-700">{{ ticket.empresa.nombre }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        {% if ticket.activo %}
+                            <div class="flex items-center mb-3 text-sm">
+                                <i class="fas fa-laptop text-gray-500 mr-1"></i>
+                                <span class="text-gray-700">{{ ticket.activo.nombre }}</span>
+                            </div>
+                        {% endif %}
+                        
+                        <div class="flex justify-between items-center text-sm text-gray-500">
+                            <span><i class="far fa-calendar-alt mr-1"></i> {{ ticket.fecha_creacion|date:"d/m/Y H:i" }}</span>
+                            
+                            {% if perfil.rol == 'tecnico' or perfil.rol == 'admin' %}
+                                {% if ticket.estado != 'cerrado' %}
+                                <div class="flex space-x-2">
+                                    {% if ticket.estado == 'abierto' %}
+                                    <a href="{% url 'cambiar_estado_ticket' ticket.id 'en_progreso' %}" class="text-yellow-600 hover:underline">
+                                        <i class="fas fa-play-circle"></i> En progreso
+                                    </a>
+                                    {% endif %}
+                                    <a href="{% url 'cerrar_ticket' ticket.id %}" class="text-green-600 hover:underline">
+                                        <i class="fas fa-check-circle"></i> Cerrar
+                                    </a>
+                                </div>
+                                {% else %}
+                                <a href="{% url 'cambiar_estado_ticket' ticket.id 'abierto' %}" class="text-blue-600 hover:underline">
+                                    <i class="fas fa-redo"></i> Reabrir
+                                </a>
+                                {% endif %}
+                            {% else %}
+                                <a href="#" class="text-blue-600 hover:underline">Ver detalles</a>
+                            {% endif %}
+                        </div>
+                        
+                        {% if ticket.estado == 'cerrado' and ticket.comentario_cierre %}
+                        <div class="mt-3 p-2 bg-gray-50 rounded text-sm">
+                            <p class="font-medium text-gray-700">Comentario de cierre:</p>
+                            <p class="text-gray-600">{{ ticket.comentario_cierre }}</p>
+                            <div class="mt-1 text-xs text-gray-500">
+                                Cerrado por {{ ticket.cerrado_por.username }} el {{ ticket.fecha_cierre|date:"d/m/Y H:i" }}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-yellow-50 p-4 rounded-md border border-yellow-200 text-yellow-800">
+            <i class="fas fa-exclamation-triangle mr-2"></i>No hay tickets registrados.
+        </div>
+    {% endif %}
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        const ticketCards = document.querySelectorAll('.ticket-card');
+
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+
+                const filter = this.dataset.filter;
+
+                ticketCards.forEach(card => {
+                    if (filter === 'all' || card.dataset.estado === filter) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}

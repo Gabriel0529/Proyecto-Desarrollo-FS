@@ -1,0 +1,139 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}Crear Ticket - Sistema de Gestión de Activos{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-md rounded-lg p-6 max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold text-gray-800 mb-6">
+        <i class="fas fa-plus-circle text-green-600 mr-2"></i>Crear Nuevo Ticket
+    </h1>
+
+    <form method="post" class="space-y-6" id="ticket-form">
+        {% csrf_token %}
+        
+        <div class="space-y-2">
+            <label for="{{ form.titulo.id_for_label }}" class="block text-sm font-medium text-gray-700">Título</label>
+            {{ form.titulo }}
+            {% if form.titulo.errors %}
+                <p class="text-red-600 text-sm mt-1">{{ form.titulo.errors.0 }}</p>
+            {% endif %}
+        </div>
+        
+        <div class="space-y-2">
+            <label for="{{ form.descripcion.id_for_label }}" class="block text-sm font-medium text-gray-700">Descripción</label>
+            {{ form.descripcion }}
+            {% if form.descripcion.errors %}
+                <p class="text-red-600 text-sm mt-1">{{ form.descripcion.errors.0 }}</p>
+            {% endif %}
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-2">
+                <label for="{{ form.prioridad.id_for_label }}" class="block text-sm font-medium text-gray-700">Prioridad</label>
+                {{ form.prioridad }}
+                {% if form.prioridad.errors %}
+                    <p class="text-red-600 text-sm mt-1">{{ form.prioridad.errors.0 }}</p>
+                {% endif %}
+            </div>
+            
+            <div class="space-y-2">
+                <label for="{{ form.empresa.id_for_label }}" class="block text-sm font-medium text-gray-700">Empresa</label>
+                {{ form.empresa }}
+                {% if form.empresa.errors %}
+                    <p class="text-red-600 text-sm mt-1">{{ form.empresa.errors.0 }}</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="space-y-2">
+            <label for="{{ form.activo.id_for_label }}" class="block text-sm font-medium text-gray-700">Activo Relacionado</label>
+            {{ form.activo }}
+            {% if form.activo.errors %}
+                <p class="text-red-600 text-sm mt-1">{{ form.activo.errors.0 }}</p>
+            {% endif %}
+            <div id="loading-activos" class="text-sm text-gray-500 hidden">
+                <i class="fas fa-spinner fa-spin mr-1"></i> Cargando activos...
+            </div>
+        </div>
+        
+        <div class="flex justify-end space-x-3 pt-4">
+            <a href="{% url 'lista_tickets' %}" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition">
+                Cancelar
+            </a>
+            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition">
+                <i class="fas fa-save mr-1"></i> Guardar Ticket
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const empresaSelect = document.getElementById('id_empresa');
+        const activoSelect = document.getElementById('id_activo');
+        const loadingActivos = document.getElementById('loading-activos');
+        
+        function cargarActivos() {
+            const empresaId = empresaSelect.value;
+            if (empresaId) {
+                loadingActivos.classList.remove('hidden');
+                
+                activoSelect.innerHTML = '';
+                activoSelect.disabled = true;
+                
+                fetch(`/api/activos-por-empresa/?empresa_id=${empresaId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        activoSelect.innerHTML = '<option value="">Seleccione un activo</option>';
+                        
+                        data.forEach(activo => {
+                            const option = document.createElement('option');
+                            option.value = activo.id;
+                            option.textContent = activo.nombre;
+                            activoSelect.appendChild(option);
+                        });
+                        
+                        if (data.length === 0) {
+                            activoSelect.innerHTML = '<option value="">No hay activos disponibles</option>';
+                        }
+                        
+                        activoSelect.disabled = false;
+                        
+                        loadingActivos.classList.add('hidden');
+                    })
+                    .catch(error => {
+                        console.error('Error al cargar los activos:', error);
+                        activoSelect.innerHTML = '<option value="">Error al cargar activos</option>';
+                        activoSelect.disabled = false;
+                        loadingActivos.classList.add('hidden');
+                    });
+            } else {
+                activoSelect.innerHTML = '<option value="">Seleccione primero una empresa</option>';
+                activoSelect.disabled = true;
+            }
+        }
+        
+        empresaSelect.addEventListener('change', cargarActivos);
+        
+        cargarActivos();
+        
+        document.getElementById('ticket-form').addEventListener('submit', function(e) {
+            let isValid = true;
+            
+            if (!document.getElementById('id_titulo').value.trim()) {
+                isValid = false;
+                alert('Por favor, ingrese un título para el ticket.');
+            }
+            
+            if (!empresaSelect.value) {
+                isValid = false;
+                alert('Por favor, seleccione una empresa.');
+            }
+            
+            if (!isValid) {
+                e.preventDefault();
+            }
+        });
+    });
+</script>
+{% endblock %}

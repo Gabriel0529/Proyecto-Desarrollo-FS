@@ -1,0 +1,160 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}Inicio - Sistema de Gestión de Activos{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-md rounded-lg p-6">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">
+        <i class="fas fa-tachometer-alt text-blue-600 mr-2"></i>Dashboard
+    </h1>
+    
+    <div class="mb-8">
+        <h2 class="text-2xl font-bold text-gray-700 mb-4">
+            Bienvenido, {{ user.username }}
+            {% if perfil.rol == 'admin' %}
+                <span class="ml-2 text-sm bg-red-500 text-white px-2 py-1 rounded">Administrador</span>
+            {% elif perfil.rol == 'tecnico' %}
+                <span class="ml-2 text-sm bg-green-500 text-white px-2 py-1 rounded">Técnico</span>
+            {% else %}
+                <span class="ml-2 text-sm bg-blue-500 text-white px-2 py-1 rounded">Cliente</span>
+            {% endif %}
+        </h2>
+        <p class="text-gray-600 mb-4">
+            {% if perfil.rol == 'cliente' %}
+                Gestiona tus activos y tickets de soporte desde un solo lugar.
+            {% elif perfil.rol == 'tecnico' %}
+                Gestiona tickets de soporte y visualiza activos de todas las empresas.
+            {% else %}
+                Administra empresas, activos y tickets desde un solo lugar.
+            {% endif %}
+        </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-blue-50 rounded-lg p-6 shadow-sm border border-blue-100">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-blue-600 font-medium">Total de Activos</p>
+                    <h3 class="text-3xl font-bold text-gray-800">{{ activos_count }}</h3>
+                </div>
+                <div class="bg-blue-100 p-3 rounded-full">
+                    <i class="fas fa-laptop text-2xl text-blue-600"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-green-50 rounded-lg p-6 shadow-sm border border-green-100">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-green-600 font-medium">Tickets Abiertos</p>
+                    <h3 class="text-3xl font-bold text-gray-800">{{ tickets_abiertos }}</h3>
+                </div>
+                <div class="bg-green-100 p-3 rounded-full">
+                    <i class="fas fa-ticket-alt text-2xl text-green-600"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-yellow-50 rounded-lg p-6 shadow-sm border border-yellow-100">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-yellow-600 font-medium">Tickets Pendientes</p>
+                    <h3 class="text-3xl font-bold text-gray-800">{{ tickets_en_progreso }}</h3>
+                </div>
+                <div class="bg-yellow-100 p-3 rounded-full">
+                    <i class="fas fa-clock text-2xl text-yellow-600"></i>
+                </div>
+            </div>
+        </div>
+        
+        {% if perfil.rol == 'admin' or perfil.rol == 'tecnico' %}
+        <div class="bg-purple-50 rounded-lg p-6 shadow-sm border border-purple-100">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-purple-600 font-medium">Total Empresas</p>
+                    <h3 class="text-3xl font-bold text-gray-800">{{ empresas_count }}</h3>
+                </div>
+                <div class="bg-purple-100 p-3 rounded-full">
+                    <i class="fas fa-building text-2xl text-purple-600"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-gray-50 rounded-lg p-6 shadow-sm border border-gray-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 font-medium">Tickets Cerrados</p>
+                    <h3 class="text-3xl font-bold text-gray-800">{{ tickets_cerrados }}</h3>
+                </div>
+                <div class="bg-gray-200 p-3 rounded-full">
+                    <i class="fas fa-check-circle text-2xl text-gray-600"></i>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-lg p-6 shadow-md border border-gray-200">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-tasks text-blue-600 mr-2"></i>Acciones Rápidas
+            </h3>
+            <div class="grid grid-cols-1 gap-3">
+                <a href="{% url 'activos_por_empresa' %}" class="flex items-center p-3 bg-blue-50 rounded hover:bg-blue-100 transition">
+                    <i class="fas fa-laptop text-blue-600 mr-3"></i>
+                    <span>Ver todos los activos</span>
+                </a>
+                <a href="{% url 'lista_tickets' %}" class="flex items-center p-3 bg-green-50 rounded hover:bg-green-100 transition">
+                    <i class="fas fa-ticket-alt text-green-600 mr-3"></i>
+                    <span>Ver todos los tickets</span>
+                </a>
+                <a href="{% url 'crear_ticket' %}" class="flex items-center p-3 bg-yellow-50 rounded hover:bg-yellow-100 transition">
+                    <i class="fas fa-plus-circle text-yellow-600 mr-3"></i>
+                    <span>Crear nuevo ticket</span>
+                </a>
+                
+                {% if perfil.rol == 'admin' %}
+                <a href="{% url 'crear_activo' %}" class="flex items-center p-3 bg-purple-50 rounded hover:bg-purple-100 transition">
+                    <i class="fas fa-plus-circle text-purple-600 mr-3"></i>
+                    <span>Crear nuevo activo</span>
+                </a>
+                {% endif %}
+                
+                <a href="/admin/" class="flex items-center p-3 bg-gray-50 rounded hover:bg-gray-100 transition">
+                    <i class="fas fa-cog text-gray-600 mr-3"></i>
+                    <span>Panel de administración</span>
+                </a>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg p-6 shadow-md border border-gray-200">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-exclamation-circle text-red-600 mr-2"></i>Tickets Prioritarios
+            </h3>
+            {% if tickets_alta_prioridad %}
+                <div class="space-y-3">
+                    {% for ticket in tickets_alta_prioridad %}
+                        <div class="p-3 bg-red-50 rounded border border-red-100">
+                            <h4 class="font-bold text-gray-800">{{ ticket.titulo }}</h4>
+                            <p class="text-sm text-gray-600 truncate">{{ ticket.descripcion }}</p>
+                            <div class="flex justify-between mt-2 text-xs text-gray-500">
+                                <span>{{ ticket.fecha_creacion|date:"d/m/Y" }}</span>
+                                <span class="bg-red-100 text-red-800 px-2 py-1 rounded">Alta prioridad</span>
+                            </div>
+                            {% if perfil.rol == 'tecnico' or perfil.rol == 'admin' %}
+                            <div class="mt-2 flex justify-end">
+                                <a href="{% url 'cerrar_ticket' ticket.id %}" class="text-sm text-blue-600 hover:underline">
+                                    <i class="fas fa-check-circle mr-1"></i> Cerrar ticket
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-gray-600">No hay tickets de alta prioridad.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

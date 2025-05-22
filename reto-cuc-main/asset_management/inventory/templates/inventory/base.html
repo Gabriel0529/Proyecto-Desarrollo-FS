@@ -1,0 +1,118 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema de Gestión de Activos{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body class="bg-gray-50 font-sans">
+    <div class="min-h-screen flex flex-col">
+        {% if user.is_authenticated %}
+        <nav class="bg-blue-600 text-white shadow-md">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <a href="{% url 'inicio' %}" class="flex items-center space-x-2">
+                            <i class="fas fa-laptop-code text-2xl"></i>
+                            <span class="font-bold text-xl">AssetManager</span>
+                        </a>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <a href="{% url 'inicio' %}" class="px-3 py-2 rounded-md hover:bg-blue-700 transition">
+                            <i class="fas fa-home mr-1"></i> Inicio
+                        </a>
+                        <a href="{% url 'activos_por_empresa' %}" class="px-3 py-2 rounded-md hover:bg-blue-700 transition">
+                            <i class="fas fa-laptop mr-1"></i> Activos
+                        </a>
+                        <a href="{% url 'lista_tickets' %}" class="px-3 py-2 rounded-md hover:bg-blue-700 transition">
+                            <i class="fas fa-ticket-alt mr-1"></i> Tickets
+                        </a>
+                        
+                        {% if perfil.rol == 'admin' %}
+                        <a href="{% url 'crear_activo' %}" class="px-3 py-2 rounded-md hover:bg-blue-700 transition">
+                            <i class="fas fa-plus-circle mr-1"></i> Nuevo Activo
+                        </a>
+                        {% endif %}
+                        
+                        <div class="relative" id="user-menu-container">
+                            <button id="user-menu-button" class="flex items-center px-3 py-2 rounded-md hover:bg-blue-700 transition">
+                                <i class="fas fa-user-circle mr-1"></i> 
+                                {{ user.username }} 
+                                {% if perfil.rol == 'admin' %}
+                                    <span class="ml-1 text-xs bg-red-500 text-white px-1 rounded">Admin</span>
+                                {% elif perfil.rol == 'tecnico' %}
+                                    <span class="ml-1 text-xs bg-green-500 text-white px-1 rounded">Técnico</span>
+                                {% else %}
+                                    <span class="ml-1 text-xs bg-blue-300 text-blue-900 px-1 rounded">Cliente</span>
+                                {% endif %}
+                                <i class="fas fa-chevron-down ml-1 text-xs"></i>
+                            </button>
+                            <div id="user-dropdown-menu" class="absolute right-0 w-48 mt-2 bg-white rounded-md shadow-lg hidden z-10">
+                                <a href="/admin/" class="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                                    <i class="fas fa-cog mr-1"></i> Administración
+                                </a>
+                                <a href="{% url 'logout' %}" class="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                                    <i class="fas fa-sign-out-alt mr-1"></i> Cerrar sesión
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        {% endif %}
+
+        {% if messages %}
+            <div class="max-w-7xl mx-auto w-full px-4 mt-4">
+                {% for message in messages %}
+                    <div class="p-4 mb-4 rounded-md {% if message.tags == 'success' %}bg-green-100 text-green-800{% elif message.tags == 'error' %}bg-red-100 text-red-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <main class="flex-grow">
+            <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+
+        <footer class="bg-gray-800 text-white py-4 mt-auto">
+            <div class="max-w-7xl mx-auto px-4 text-center">
+                <p>&copy; 2025 Sistema de Gestión de Activos. Todos los derechos reservados.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const userMenuButton = document.getElementById('user-menu-button');
+            const userDropdownMenu = document.getElementById('user-dropdown-menu');
+            
+            function toggleMenu() {
+                userDropdownMenu.classList.toggle('hidden');
+            }
+            
+            userMenuButton.addEventListener('click', function(e) {
+                e.stopPropagation();
+                toggleMenu();
+            });
+            
+            document.addEventListener('click', function(e) {
+                if (!userMenuButton.contains(e.target) && !userDropdownMenu.contains(e.target)) {
+                    userDropdownMenu.classList.add('hidden');
+                }
+            });
+            
+            userDropdownMenu.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        });
+    </script>
+</body>
+</html>
