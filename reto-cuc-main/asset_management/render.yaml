@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: asset-management
+    env: python
+    buildCommand: ./build.sh
+    startCommand: gunicorn asset_management.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DEBUG
+        value: False
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        value: .onrender.com,localhost,127.0.0.1
+      - key: DATABASE_URL
+        fromDatabase:
+          name: asset-management-db
+          property: connectionString
+
+databases:
+  - name: asset-management-db
+    databaseName: asset_management
+    user: asset_management_user
