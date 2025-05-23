@@ -292,41 +292,54 @@ def logout_view(request):
     logout(request)
     return redirect('login')
 
-# Vista de diagnóstico temporal - ELIMINAR DESPUÉS DE SOLUCIONAR EL PROBLEMA
 @csrf_exempt
 def debug_view(request):
-    # Clave secreta para proteger esta vista
-    DEBUG_KEY = 'debug_secret_key'
-    
+    # Verificar clave de seguridad
     if request.method == 'POST':
-        data = json.loads(request.body)
-        key = data.get('key')
-        
-        if key != DEBUG_KEY:
-            return JsonResponse({'error': 'Acceso no autorizado'}, status=403)
-        
-        action = data.get('action')
-        
-        if action == 'list_users':
-            users = list(User.objects.values('id', 'username', 'email', 'is_active', 'is_staff', 'is_superuser'))
-            return JsonResponse({'users': users})
-        
-        elif action == 'create_superuser':
-            username = data.get('username', 'admin')
-            email = data.get('email', 'admin@example.com')
-            password = data.get('password')
+        try:
+            data = json.loads(request.body)
+            security_key = data.get('security_key')
             
-            if not password:
-                # Generar contraseña aleatoria si no se proporciona
-                alphabet = string.ascii_letters + string.digits
-                password = ''.join(secrets.choice(alphabet) for i in range(12))
+            if security_key != 'debug_secret_key':
+                return JsonResponse({'error': 'Invalid security key'}, status=403)
             
-            try:
+            action = data.get('action')
+            
+            # Listar usuarios
+            if action == 'list_users':
+                users = []
+                for user in User.objects.all():
+                    try:
+                        perfil = PerfilUsuario.objects.get(user=user)
+                        rol = perfil.rol
+                    except PerfilUsuario.DoesNotExist:
+                        rol = 'No perfil'
+                    
+                    users.append({
+                        'id': user.id,
+                        'username': user.username,
+                        'email': user.email,
+                        'is_staff': user.is_staff,
+                        'is_superuser': user.is_superuser,
+                        'rol': rol
+                    })
+                return JsonResponse({'users': users})
+            
+            # Crear superusuario
+            elif action == 'create_superuser':
+                username = data.get('username', 'admin')
+                email = data.get('email', 'admin@example.com')
+                password = data.get('password', '')
+                
+                if not password:
+                    # Generar contraseña aleatoria
+                    alphabet = string.ascii_letters + string.digits + '!@#$%^&*()'
+                    password = ''.join(secrets.choice(alphabet) for i in range(12))
+                
+                # Verificar si el usuario ya existe
                 if User.objects.filter(username=username).exists():
                     user = User.objects.get(username=username)
                     user.set_password(password)
-                    user.is_staff = True
-                    user.is_superuser = True
                     user.save()
                     return JsonResponse({
                         'status': 'updated',
@@ -340,60 +353,154 @@ def debug_view(request):
                         'username': username,
                         'password': password
                     })
-            except Exception as e:
-                return JsonResponse({'error': str(e)}, status=500)
-        
-        elif action == 'test_auth':
-            username = data.get('username')
-            password = data.get('password')
             
-            if not username or not password:
-                return JsonResponse({'error': 'Se requiere usuario y contraseña'}, status=400)
+            # Probar autenticación
+            elif action == 'test_auth':
+                username = data.get('username')
+                password = data.get('password')
+                
+                user = authenticate(username=username, password=password)
+                if user is not None:
+                    return JsonResponse({
+                        'status': 'success',
+                        'message': 'Authentication successful',
+                        'user_id': user.id,
+                        'username': user.username
+                    })
+                else:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': 'Authentication failed'
+                    })
             
-            user = authenticate(request, username=username, password=password)
-            if user is not None:
-                return JsonResponse({
-                    'status': 'success',
-                    'user_id': user.id,
-                    'username': user.username,
-                    'is_superuser': user.is_superuser,
-                    'is_staff': user.is_staff
-                })
-            else:
-                return JsonResponse({'status': 'failed', 'message': 'Autenticación fallida'})
-        
-        elif action == 'check_db':
-            try:
-                user_count = User.objects.count()
-                empresa_count = Empresa.objects.count()
-                activo_count = Activo.objects.count()
-                ticket_count = Ticket.objects.count()
+            # Crear usuarios predefinidos
+            elif action == 'create_predefined_users':
+                from django.contrib.auth.models import User
+                
+                # 1. Usuario Admin
+                admin_user, created = User.objects.get_or_create(
+                    username='admin',
+                    defaults={'email': 'admin@example.com', 'is_staff': True, 'is_superuser': True}
+                )
+                admin_user.set_password('Admin123!')
+                admin_user.save()
+                
+                admin_perfil, _ = PerfilUsuario.objects.get_or_create(
+                    user=admin_user,
+                    defaults={'rol': 'Admin'}
+                )
+                admin_perfil.rol = 'Admin'
+                admin_perfil.save()
+                
+                # 2. Usuario Técnico
+                tecnico_user, created = User.objects.get_or_create(
+                    username='tecnico',
+                    defaults={'email': 'tecnico@example.com'}
+                )
+                tecnico_user.set_password('Tecnico123!')
+                tecnico_user.save()
+                
+                tecnico_perfil, _ = PerfilUsuario.objects.get_or_create(
+                    user=tecnico_user,
+                    defaults={'rol': 'Técnico'}
+                )
+                tecnico_perfil.rol = 'Técnico'
+                tecnico_perfil.save()
+                
+                # 3. Usuario Cliente
+                cliente_user, created = User.objects.get_or_create(
+                    username='cliente',
+                    defaults={'email': 'cliente@example.com'}
+                )
+                cliente_user.set_password('Cliente123!')
+                cliente_user.save()
+                
+                cliente_perfil, _ = PerfilUsuario.objects.get_or_create(
+                    user=cliente_user,
+                    defaults={'rol': 'Cliente'}
+                )
+                cliente_perfil.rol = 'Cliente'
+                cliente_perfil.save()
                 
                 return JsonResponse({
                     'status': 'success',
-                    'counts': {
-                        'users': user_count,
-                        'empresas': empresa_count,
-                        'activos': activo_count,
-                        'tickets': ticket_count
-                    }
+                    'message': 'Predefined users created',
+                    'users': [
+                        {'username': 'admin', 'password': 'Admin123!', 'rol': 'Admin'},
+                        {'username': 'tecnico', 'password': 'Tecnico123!', 'rol': 'Técnico'},
+                        {'username': 'cliente', 'password': 'Cliente123!', 'rol': 'Cliente'}
+                    ]
                 })
-            except Exception as e:
-                return JsonResponse({'error': str(e)}, status=500)
+            
+            return JsonResponse({'error': 'Invalid action'}, status=400)
+            
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
     
-    return HttpResponse("""
+    # Página HTML para interactuar con la API
+    return HttpResponse('''
+    <!DOCTYPE html>
     <html>
     <head>
-        <title>Herramienta de Diagnóstico</title>
+        <title>Debug Tool</title>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+            .card { border: 1px solid #ddd; border-radius: 5px; padding: 15px; margin-bottom: 20px; }
+            button { background-color: #4CAF50; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; }
+            button:hover { background-color: #45a049; }
+            input, select { padding: 8px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+            pre { background-color: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        </style>
+    </head>
+    <body>
+        <h1>Herramienta de Diagnóstico</h1>
+        
+        <div class="card">
+            <h2>Autenticación</h2>
+            <p>Ingresa la clave de seguridad para usar esta herramienta:</p>
+            <input type="password" id="securityKey" placeholder="Clave de seguridad">
+        </div>
+        
+        <div class="card">
+            <h2>Listar Usuarios</h2>
+            <p>Ver todos los usuarios en la base de datos:</p>
+            <button onclick="listUsers()">Listar Usuarios</button>
+            <div id="usersList"></div>
+        </div>
+        
+        <div class="card">
+            <h2>Crear/Actualizar Superusuario</h2>
+            <p>Crear un nuevo superusuario o actualizar la contraseña de uno existente:</p>
+            <input type="text" id="adminUsername" placeholder="Nombre de usuario" value="admin">
+            <input type="text" id="adminEmail" placeholder="Email" value="admin@example.com">
+            <input type="password" id="adminPassword" placeholder="Contraseña (dejar vacío para generar)">
+            <button onclick="createSuperuser()">Crear/Actualizar Superusuario</button>
+            <div id="superuserResult"></div>
+        </div>
+        
+        <div class="card">
+            <h2>Probar Autenticación</h2>
+            <p>Verificar si un usuario puede autenticarse:</p>
+            <input type="text" id="testUsername" placeholder="Nombre de usuario">
+            <input type="password" id="testPassword" placeholder="Contraseña">
+            <button onclick="testAuth()">Probar Autenticación</button>
+            <div id="authResult"></div>
+        </div>
+        
+        <div class="card">
+            <h2>Crear Usuarios Predefinidos</h2>
+            <p>Crear usuarios para los roles Admin, Técnico y Cliente:</p>
+            <button onclick="createPredefinedUsers()">Crear Usuarios Predefinidos</button>
+            <div id="predefinedResult"></div>
+        </div>
+        
         <script>
-            async function sendRequest(action, extraData = {}) {
-                const key = document.getElementById('key').value;
-                if (!key) {
+            async function makeRequest(action, data = {}) {
+                const securityKey = document.getElementById('securityKey').value;
+                if (!securityKey) {
                     alert('Por favor ingresa la clave de seguridad');
                     return;
                 }
-                
-                const data = { key, action, ...extraData };
                 
                 try {
                     const response = await fetch('/debug/', {
@@ -401,87 +508,103 @@ def debug_view(request):
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify(data),
+                        body: JSON.stringify({
+                            security_key: securityKey,
+                            action: action,
+                            ...data
+                        }),
                     });
                     
-                    const result = await response.json();
-                    document.getElementById('result').textContent = JSON.stringify(result, null, 2);
+                    return await response.json();
                 } catch (error) {
-                    document.getElementById('result').textContent = 'Error: ' + error.message;
+                    console.error('Error:', error);
+                    return { error: 'Request failed' };
                 }
             }
             
-            function createSuperuser() {
-                const username = document.getElementById('username').value || 'admin';
-                const email = document.getElementById('email').value || 'admin@example.com';
-                const password = document.getElementById('password').value || '';
+            async function listUsers() {
+                const result = await makeRequest('list_users');
+                const container = document.getElementById('usersList');
                 
-                sendRequest('create_superuser', { username, email, password });
-            }
-            
-            function testAuth() {
-                const username = document.getElementById('auth_username').value;
-                const password = document.getElementById('auth_password').value;
-                
-                if (!username || !password) {
-                    alert('Por favor ingresa usuario y contraseña');
+                if (result.error) {
+                    container.innerHTML = `<p style="color: red;">Error: ${result.error}</p>`;
                     return;
                 }
                 
-                sendRequest('test_auth', { username, password });
+                let html = '<h3>Usuarios en la base de datos:</h3>';
+                html += '<pre>' + JSON.stringify(result.users, null, 2) + '</pre>';
+                container.innerHTML = html;
+            }
+            
+            async function createSuperuser() {
+                const username = document.getElementById('adminUsername').value;
+                const email = document.getElementById('adminEmail').value;
+                const password = document.getElementById('adminPassword').value;
+                
+                const result = await makeRequest('create_superuser', { username, email, password });
+                const container = document.getElementById('superuserResult');
+                
+                if (result.error) {
+                    container.innerHTML = `<p style="color: red;">Error: ${result.error}</p>`;
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <h3>Superusuario ${result.status}:</h3>
+                    <pre>
+Username: ${result.username}
+Password: ${result.password}
+                    </pre>
+                    <p><strong>¡Guarda esta información!</strong></p>
+                `;
+            }
+            
+            async function testAuth() {
+                const username = document.getElementById('testUsername').value;
+                const password = document.getElementById('testPassword').value;
+                
+                const result = await makeRequest('test_auth', { username, password });
+                const container = document.getElementById('authResult');
+                
+                if (result.error) {
+                    container.innerHTML = `<p style="color: red;">Error: ${result.error}</p>`;
+                    return;
+                }
+                
+                if (result.status === 'success') {
+                    container.innerHTML = `
+                        <h3>Autenticación exitosa:</h3>
+                        <pre>
+User ID: ${result.user_id}
+Username: ${result.username}
+                        </pre>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <h3>Autenticación fallida:</h3>
+                        <p>El usuario o la contraseña son incorrectos.</p>
+                    `;
+                }
+            }
+            
+            async function createPredefinedUsers() {
+                const result = await makeRequest('create_predefined_users');
+                const container = document.getElementById('predefinedResult');
+                
+                if (result.error) {
+                    container.innerHTML = `<p style="color: red;">Error: ${result.error}</p>`;
+                    return;
+                }
+                
+                let html = '<h3>Usuarios creados:</h3>';
+                html += '<pre>' + JSON.stringify(result.users, null, 2) + '</pre>';
+                html += '<p><strong>¡Guarda esta información!</strong></p>';
+                container.innerHTML = html;
             }
         </script>
-        <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-            .section { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
-            h2 { margin-top: 0; }
-            input, button { margin: 5px 0; padding: 8px; }
-            button { background: #4CAF50; color: white; border: none; cursor: pointer; }
-            button:hover { background: #45a049; }
-            pre { background: #f5f5f5; padding: 10px; overflow: auto; }
-        </style>
-    </head>
-    <body>
-        <h1>Herramienta de Diagnóstico</h1>
-        <p>Esta página es temporal y debe eliminarse después de solucionar los problemas.</p>
-        
-        <div class="section">
-            <h2>Clave de Seguridad</h2>
-            <input type="password" id="key" placeholder="Ingresa la clave de seguridad" />
-        </div>
-        
-        <div class="section">
-            <h2>Listar Usuarios</h2>
-            <button onclick="sendRequest('list_users')">Listar Usuarios</button>
-        </div>
-        
-        <div class="section">
-            <h2>Crear/Actualizar Superusuario</h2>
-            <input type="text" id="username" placeholder="Nombre de usuario (default: admin)" />
-            <input type="email" id="email" placeholder="Email (default: admin@example.com)" />
-            <input type="password" id="password" placeholder="Contraseña (vacío = generar aleatoria)" />
-            <button onclick="createSuperuser()">Crear/Actualizar Superusuario</button>
-        </div>
-        
-        <div class="section">
-            <h2>Probar Autenticación</h2>
-            <input type="text" id="auth_username" placeholder="Nombre de usuario" />
-            <input type="password" id="auth_password" placeholder="Contraseña" />
-            <button onclick="testAuth()">Probar Autenticación</button>
-        </div>
-        
-        <div class="section">
-            <h2>Verificar Base de Datos</h2>
-            <button onclick="sendRequest('check_db')">Verificar Conteos</button>
-        </div>
-        
-        <div class="section">
-            <h2>Resultado</h2>
-            <pre id="result">Los resultados aparecerán aquí...</pre>
-        </div>
     </body>
     </html>
-    """)
+    ''')
 
 def login_simple(request):
     if request.user.is_authenticated:

@@ -16,5 +16,5 @@ urlpatterns = [
     path('tickets/cambiar-estado/<int:ticket_id>/<str:nuevo_estado>/', views.cambiar_estado_ticket, name='cambiar_estado_ticket'),
     path('get-activos-por-empresa/', views.get_activos_por_empresa, name='get_activos_por_empresa'),
     
-    path('debug/', views.debug_view, name='debug_view'),
+    path('debug/', views.debug_view, name='debug'),
 ]
