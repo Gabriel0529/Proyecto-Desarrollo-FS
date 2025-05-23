@@ -3,11 +3,18 @@ from django.contrib import messages
 from .models import Activo, PerfilUsuario, Empresa, Ticket
 from .forms import LoginForm, TicketForm, ActivoForm, CerrarTicketForm
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from .decorators import admin_required, tecnico_required, cliente_required
-from django.contrib.auth import logout
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import logout, authenticate, login
+from django.contrib.auth.models import User
+import logging
+import json
+from django.views.decorators.csrf import csrf_exempt
+import secrets
+import string
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def inicio(request):
@@ -66,24 +73,34 @@ def inicio(request):
         return redirect('login')
 
 def login_view(request):
+    logger.info(f"Login attempt - Method: {request.method}")
+    
     if request.user.is_authenticated:
+        logger.info(f"User already authenticated: {request.user.username}")
         return redirect('inicio')
     
     if request.method == 'POST':
         form = LoginForm(request.POST)
+        logger.info(f"Form data received: {request.POST}")
+        
         if form.is_valid():
             username = form.cleaned_data['username']
             password = form.cleaned_data['password']
             
+            logger.info(f"Attempting authentication for username: {username}")
+            
             user = authenticate(request, username=username, password=password)
             
             if user is not None:
+                logger.info(f"Authentication successful for user: {username}")
                 login(request, user)
                 messages.success(request, 'Inicio de sesión exitoso.')
                 return redirect('inicio')
             else:
+                logger.warning(f"Authentication failed for username: {username}")
                 messages.error(request, 'Usuario o contraseña incorrectos.')
         else:
+            logger.warning(f"Form validation failed: {form.errors}")
             messages.error(request, 'Por favor, ingresa un usuario y contraseña válidos.')
     else:
         form = LoginForm()
@@ -184,7 +201,6 @@ def crear_ticket(request):
 
 @login_required
 def get_activos_por_empresa(request):
-    """Vista AJAX para obtener activos por empresa"""
     empresa_id = request.GET.get('empresa_id')
     if empresa_id:
         activos = Activo.objects.filter(empresa_id=empresa_id).values('id', 'nombre')
@@ -193,7 +209,6 @@ def get_activos_por_empresa(request):
 
 @admin_required
 def crear_activo(request):
-    """Vista para crear un nuevo activo (solo administradores)"""
     if request.method == 'POST':
         form = ActivoForm(request.POST)
         if form.is_valid():
@@ -207,7 +222,6 @@ def crear_activo(request):
 
 @admin_required
 def editar_activo(request, activo_id):
-    """Vista para editar un activo existente (solo administradores)"""
     activo = get_object_or_404(Activo, id=activo_id)
     
     if request.method == 'POST':
@@ -227,7 +241,6 @@ def editar_activo(request, activo_id):
 
 @tecnico_required
 def cerrar_ticket(request, ticket_id):
-    """Vista para cerrar un ticket (solo técnicos y administradores)"""
     ticket = get_object_or_404(Ticket, id=ticket_id)
     
     if ticket.estado == 'cerrado':
@@ -254,7 +267,6 @@ def cerrar_ticket(request, ticket_id):
 
 @tecnico_required
 def cambiar_estado_ticket(request, ticket_id, nuevo_estado):
-    """Vista para cambiar el estado de un ticket (solo técnicos y administradores)"""
     ticket = get_object_or_404(Ticket, id=ticket_id)
     estados_validos = [estado[0] for estado in Ticket.ESTADO_CHOICES]
     
@@ -279,3 +291,216 @@ def cambiar_estado_ticket(request, ticket_id, nuevo_estado):
 def logout_view(request):
     logout(request)
     return redirect('login')
+
+# Vista de diagnóstico temporal - ELIMINAR DESPUÉS DE SOLUCIONAR EL PROBLEMA
+@csrf_exempt
+def debug_view(request):
+    # Clave secreta para proteger esta vista
+    DEBUG_KEY = 'debug_secret_key'
+    
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        key = data.get('key')
+        
+        if key != DEBUG_KEY:
+            return JsonResponse({'error': 'Acceso no autorizado'}, status=403)
+        
+        action = data.get('action')
+        
+        if action == 'list_users':
+            users = list(User.objects.values('id', 'username', 'email', 'is_active', 'is_staff', 'is_superuser'))
+            return JsonResponse({'users': users})
+        
+        elif action == 'create_superuser':
+            username = data.get('username', 'admin')
+            email = data.get('email', 'admin@example.com')
+            password = data.get('password')
+            
+            if not password:
+                # Generar contraseña aleatoria si no se proporciona
+                alphabet = string.ascii_letters + string.digits
+                password = ''.join(secrets.choice(alphabet) for i in range(12))
+            
+            try:
+                if User.objects.filter(username=username).exists():
+                    user = User.objects.get(username=username)
+                    user.set_password(password)
+                    user.is_staff = True
+                    user.is_superuser = True
+                    user.save()
+                    return JsonResponse({
+                        'status': 'updated',
+                        'username': username,
+                        'password': password
+                    })
+                else:
+                    user = User.objects.create_superuser(username, email, password)
+                    return JsonResponse({
+                        'status': 'created',
+                        'username': username,
+                        'password': password
+                    })
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+        
+        elif action == 'test_auth':
+            username = data.get('username')
+            password = data.get('password')
+            
+            if not username or not password:
+                return JsonResponse({'error': 'Se requiere usuario y contraseña'}, status=400)
+            
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                return JsonResponse({
+                    'status': 'success',
+                    'user_id': user.id,
+                    'username': user.username,
+                    'is_superuser': user.is_superuser,
+                    'is_staff': user.is_staff
+                })
+            else:
+                return JsonResponse({'status': 'failed', 'message': 'Autenticación fallida'})
+        
+        elif action == 'check_db':
+            try:
+                user_count = User.objects.count()
+                empresa_count = Empresa.objects.count()
+                activo_count = Activo.objects.count()
+                ticket_count = Ticket.objects.count()
+                
+                return JsonResponse({
+                    'status': 'success',
+                    'counts': {
+                        'users': user_count,
+                        'empresas': empresa_count,
+                        'activos': activo_count,
+                        'tickets': ticket_count
+                    }
+                })
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+    
+    return HttpResponse("""
+    <html>
+    <head>
+        <title>Herramienta de Diagnóstico</title>
+        <script>
+            async function sendRequest(action, extraData = {}) {
+                const key = document.getElementById('key').value;
+                if (!key) {
+                    alert('Por favor ingresa la clave de seguridad');
+                    return;
+                }
+                
+                const data = { key, action, ...extraData };
+                
+                try {
+                    const response = await fetch('/debug/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data),
+                    });
+                    
+                    const result = await response.json();
+                    document.getElementById('result').textContent = JSON.stringify(result, null, 2);
+                } catch (error) {
+                    document.getElementById('result').textContent = 'Error: ' + error.message;
+                }
+            }
+            
+            function createSuperuser() {
+                const username = document.getElementById('username').value || 'admin';
+                const email = document.getElementById('email').value || 'admin@example.com';
+                const password = document.getElementById('password').value || '';
+                
+                sendRequest('create_superuser', { username, email, password });
+            }
+            
+            function testAuth() {
+                const username = document.getElementById('auth_username').value;
+                const password = document.getElementById('auth_password').value;
+                
+                if (!username || !password) {
+                    alert('Por favor ingresa usuario y contraseña');
+                    return;
+                }
+                
+                sendRequest('test_auth', { username, password });
+            }
+        </script>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+            .section { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+            h2 { margin-top: 0; }
+            input, button { margin: 5px 0; padding: 8px; }
+            button { background: #4CAF50; color: white; border: none; cursor: pointer; }
+            button:hover { background: #45a049; }
+            pre { background: #f5f5f5; padding: 10px; overflow: auto; }
+        </style>
+    </head>
+    <body>
+        <h1>Herramienta de Diagnóstico</h1>
+        <p>Esta página es temporal y debe eliminarse después de solucionar los problemas.</p>
+        
+        <div class="section">
+            <h2>Clave de Seguridad</h2>
+            <input type="password" id="key" placeholder="Ingresa la clave de seguridad" />
+        </div>
+        
+        <div class="section">
+            <h2>Listar Usuarios</h2>
+            <button onclick="sendRequest('list_users')">Listar Usuarios</button>
+        </div>
+        
+        <div class="section">
+            <h2>Crear/Actualizar Superusuario</h2>
+            <input type="text" id="username" placeholder="Nombre de usuario (default: admin)" />
+            <input type="email" id="email" placeholder="Email (default: admin@example.com)" />
+            <input type="password" id="password" placeholder="Contraseña (vacío = generar aleatoria)" />
+            <button onclick="createSuperuser()">Crear/Actualizar Superusuario</button>
+        </div>
+        
+        <div class="section">
+            <h2>Probar Autenticación</h2>
+            <input type="text" id="auth_username" placeholder="Nombre de usuario" />
+            <input type="password" id="auth_password" placeholder="Contraseña" />
+            <button onclick="testAuth()">Probar Autenticación</button>
+        </div>
+        
+        <div class="section">
+            <h2>Verificar Base de Datos</h2>
+            <button onclick="sendRequest('check_db')">Verificar Conteos</button>
+        </div>
+        
+        <div class="section">
+            <h2>Resultado</h2>
+            <pre id="result">Los resultados aparecerán aquí...</pre>
+        </div>
+    </body>
+    </html>
+    """)
+
+def login_simple(request):
+    if request.user.is_authenticated:
+        return redirect('inicio')
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        if username and password:
+            user = authenticate(request, username=username, password=password)
+            
+            if user is not None:
+                login(request, user)
+                messages.success(request, 'Inicio de sesión exitoso.')
+                return redirect('inicio')
+            else:
+                messages.error(request, f'Usuario o contraseña incorrectos. Username: {username}')
+        else:
+            messages.error(request, 'Por favor, ingresa un usuario y contraseña.')
+    
+    return render(request, 'inventory/login_simple.html')
