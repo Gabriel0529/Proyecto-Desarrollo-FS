@@ -1,0 +1,103 @@
+{% extends 'inventory/base.html' %}
+
+{% block title %}Depuración de Activos - Sistema de Gestión de Activos{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-md rounded-lg p-6 max-w-4xl mx-auto">
+    <h1 class="text-2xl font-bold text-gray-800 mb-6">
+        <i class="fas fa-bug text-red-600 mr-2"></i>Depuración de Activos
+    </h1>
+    
+    <div class="mb-6">
+        <h2 class="text-xl font-semibold mb-3">Resumen</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-blue-100 p-4 rounded-lg">
+                <p class="text-lg font-bold">{{ total_empresas }}</p>
+                <p class="text-sm text-gray-600">Empresas</p>
+            </div>
+            <div class="bg-green-100 p-4 rounded-lg">
+                <p class="text-lg font-bold">{{ total_activos }}</p>
+                <p class="text-sm text-gray-600">Activos</p>
+            </div>
+            <div class="bg-purple-100 p-4 rounded-lg">
+                <p class="text-lg font-bold">{{ total_usuarios }}</p>
+                <p class="text-sm text-gray-600">Usuarios</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mb-6">
+        <h2 class="text-xl font-semibold mb-3">Usuarios</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white border border-gray-200">
+                <thead>
+                    <tr>
+                        <th class="py-2 px-4 border-b text-left">ID</th>
+                        <th class="py-2 px-4 border-b text-left">Usuario</th>
+                        <th class="py-2 px-4 border-b text-left">Rol</th>
+                        <th class="py-2 px-4 border-b text-left">Empresa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for usuario in usuarios %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-2 px-4 border-b">{{ usuario.id }}</td>
+                        <td class="py-2 px-4 border-b">{{ usuario.username }}</td>
+                        <td class="py-2 px-4 border-b">{{ usuario.rol }}</td>
+                        <td class="py-2 px-4 border-b">{{ usuario.empresa }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div>
+        <h2 class="text-xl font-semibold mb-3">Empresas y Activos</h2>
+        {% for dato in datos %}
+        <div class="mb-4 border border-gray-200 rounded-lg overflow-hidden">
+            <div class="bg-gray-100 p-3 flex justify-between items-center">
+                <h3 class="font-bold">{{ dato.empresa.nombre }} (ID: {{ dato.empresa.id }})</h3>
+                <span class="bg-blue-500 text-white px-2 py-1 rounded-full text-xs">{{ dato.activos_count }} activos</span>
+            </div>
+            {% if dato.activos %}
+            <div class="p-3">
+                <table class="min-w-full">
+                    <thead>
+                        <tr>
+                            <th class="py-2 px-4 text-left">ID</th>
+                            <th class="py-2 px-4 text-left">Nombre</th>
+                            <th class="py-2 px-4 text-left">Tipo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for activo in dato.activos %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="py-2 px-4">{{ activo.id }}</td>
+                            <td class="py-2 px-4">{{ activo.nombre }}</td>
+                            <td class="py-2 px-4">{{ activo.tipo }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-3 text-gray-500 italic">
+                No hay activos para esta empresa.
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="text-center p-4 bg-gray-50 rounded-lg">
+            <p class="text-gray-500">No hay empresas registradas.</p>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div class="mt-6 text-center">
+        <a href="{% url 'inicio' %}" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">
+            <i class="fas fa-home mr-1"></i> Volver al Inicio
+        </a>
+    </div>
+</div>
+{% endblock %}

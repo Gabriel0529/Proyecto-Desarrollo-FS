@@ -201,11 +201,25 @@ def crear_ticket(request):
 
 @login_required
 def get_activos_por_empresa(request):
-    empresa_id = request.GET.get('empresa_id')
-    if empresa_id:
+    try:
+        empresa_id = request.GET.get('empresa_id')
+        if not empresa_id:
+            return JsonResponse([], safe=False)
+        
+        # Registrar información para depuración
+        logger.info(f"Buscando activos para empresa_id: {empresa_id}")
+        
+        # Obtener activos
         activos = Activo.objects.filter(empresa_id=empresa_id).values('id', 'nombre')
-        return JsonResponse(list(activos), safe=False)
-    return JsonResponse([], safe=False)
+        activos_list = list(activos)
+        
+        # Registrar cuántos activos se encontraron
+        logger.info(f"Se encontraron {len(activos_list)} activos para la empresa {empresa_id}")
+        
+        return JsonResponse(activos_list, safe=False)
+    except Exception as e:
+        logger.error(f"Error al obtener activos: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
 
 @admin_required
 def crear_activo(request):
@@ -291,6 +305,174 @@ def cambiar_estado_ticket(request, ticket_id, nuevo_estado):
 def logout_view(request):
     logout(request)
     return redirect('login')
+
+# Vista para depurar los activos
+@login_required
+def debug_activos(request):
+    try:
+        # Obtener todas las empresas
+        empresas = Empresa.objects.all()
+        
+        # Preparar datos para mostrar
+        datos = []
+        
+        for empresa in empresas:
+            activos = Activo.objects.filter(empresa=empresa)
+            
+            datos.append({
+                'empresa': {
+                    'id': empresa.id,
+                    'nombre': empresa.nombre,
+                    'nit': empresa.nit
+                },
+                'activos': [
+                    {
+                        'id': activo.id,
+                        'nombre': activo.nombre,
+                        'tipo': activo.tipo
+                    } for activo in activos
+                ],
+                'activos_count': activos.count()
+            })
+        
+        # Obtener usuarios y sus perfiles
+        usuarios = []
+        for user in User.objects.all():
+            try:
+                perfil = PerfilUsuario.objects.get(user=user)
+                empresa = perfil.empresa.nombre if perfil.empresa else "No asignada"
+                empresa_id = perfil.empresa.id if perfil.empresa else None
+            except PerfilUsuario.DoesNotExist:
+                perfil = None
+                empresa = "No tiene perfil"
+                empresa_id = None
+            
+            usuarios.append({
+                'id': user.id,
+                'username': user.username,
+                'rol': perfil.rol if perfil else "No tiene rol",
+                'empresa': empresa,
+                'empresa_id': empresa_id
+            })
+        
+        return render(request, 'inventory/debug_activos.html', {
+            'datos': datos,
+            'usuarios': usuarios,
+            'total_empresas': empresas.count(),
+            'total_activos': Activo.objects.count(),
+            'total_usuarios': User.objects.count()
+        })
+    except Exception as e:
+        return HttpResponse(f"Error: {str(e)}")
+
+# Vista simplificada para crear usuarios predefinidos
+def create_users(request, key):
+    if key != 'create_users_123456':
+        return HttpResponse("Acceso denegado. Clave incorrecta.", status=403)
+    
+    try:
+        # 1. Usuario Admin
+        admin_user, created = User.objects.get_or_create(
+            username='admin',
+            defaults={'email': 'admin@example.com', 'is_staff': True, 'is_superuser': True}
+        )
+        admin_user.set_password('Admin123!')
+        admin_user.save()
+        
+        admin_perfil, _ = PerfilUsuario.objects.get_or_create(
+            user=admin_user,
+            defaults={'rol': 'Admin'}
+        )
+        admin_perfil.rol = 'Admin'
+        admin_perfil.save()
+        
+        # 2. Usuario Técnico
+        tecnico_user, created = User.objects.get_or_create(
+            username='tecnico',
+            defaults={'email': 'tecnico@example.com'}
+        )
+        tecnico_user.set_password('Tecnico123!')
+        tecnico_user.save()
+        
+        tecnico_perfil, _ = PerfilUsuario.objects.get_or_create(
+            user=tecnico_user,
+            defaults={'rol': 'Técnico'}
+        )
+        tecnico_perfil.rol = 'Técnico'
+        tecnico_perfil.save()
+        
+        # 3. Usuario Cliente
+        cliente_user, created = User.objects.get_or_create(
+            username='cliente',
+            defaults={'email': 'cliente@example.com'}
+        )
+        cliente_user.set_password('Cliente123!')
+        cliente_user.save()
+        
+        cliente_perfil, _ = PerfilUsuario.objects.get_or_create(
+            user=cliente_user,
+            defaults={'rol': 'Cliente'}
+        )
+        cliente_perfil.rol = 'Cliente'
+        cliente_perfil.save()
+        
+        # Crear una empresa para el cliente si no existe
+        empresa, _ = Empresa.objects.get_or_create(
+            nombre='Empresa Demo',
+            defaults={'direccion': 'Dirección Demo', 'telefono': '123456789'}
+        )
+        
+        cliente_perfil.empresa = empresa
+        cliente_perfil.save()
+        
+        return HttpResponse("""
+        <html>
+        <head>
+            <title>Usuarios Creados</title>
+            <style>
+                body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+                .card { border: 1px solid #ddd; border-radius: 5px; padding: 15px; margin-bottom: 20px; }
+                h1, h2 { color: #333; }
+                pre { background-color: #f5f5f5; padding: 10px; border-radius: 5px; }
+            </style>
+        </head>
+        <body>
+            <h1>Usuarios Creados Exitosamente</h1>
+            
+            <div class="card">
+                <h2>Usuario Administrador</h2>
+                <pre>
+Usuario: admin
+Contraseña: Admin123!
+Rol: Admin
+                </pre>
+            </div>
+            
+            <div class="card">
+                <h2>Usuario Técnico</h2>
+                <pre>
+Usuario: tecnico
+Contraseña: Tecnico123!
+Rol: Técnico
+                </pre>
+            </div>
+            
+            <div class="card">
+                <h2>Usuario Cliente</h2>
+                <pre>
+Usuario: cliente
+Contraseña: Cliente123!
+Rol: Cliente
+Empresa: Empresa Demo
+                </pre>
+            </div>
+            
+            <p><a href="/login/">Ir a la página de login</a></p>
+        </body>
+        </html>
+        """)
+    except Exception as e:
+        return HttpResponse(f"Error al crear usuarios: {str(e)}", status=500)
 
 @csrf_exempt
 def debug_view(request):

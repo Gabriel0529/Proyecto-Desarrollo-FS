@@ -54,6 +54,9 @@
             <div id="loading-activos" class="text-sm text-gray-500 hidden">
                 <i class="fas fa-spinner fa-spin mr-1"></i> Cargando activos...
             </div>
+            <div id="error-activos" class="text-sm text-red-500 hidden">
+                Error al cargar activos. <a href="#" id="retry-load-activos" class="text-blue-500 underline">Reintentar</a>
+            </div>
         </div>
         
         <div class="flex justify-end space-x-3 pt-4">
@@ -72,17 +75,27 @@
         const empresaSelect = document.getElementById('id_empresa');
         const activoSelect = document.getElementById('id_activo');
         const loadingActivos = document.getElementById('loading-activos');
+        const errorActivos = document.getElementById('error-activos');
+        const retryButton = document.getElementById('retry-load-activos');
         
         function cargarActivos() {
             const empresaId = empresaSelect.value;
             if (empresaId) {
                 loadingActivos.classList.remove('hidden');
+                errorActivos.classList.add('hidden');
                 
                 activoSelect.innerHTML = '';
                 activoSelect.disabled = true;
                 
-                fetch(`/api/activos-por-empresa/?empresa_id=${empresaId}`)
-                    .then(response => response.json())
+                const timestamp = new Date().getTime();
+                
+                fetch(`/api/activos-por-empresa/?empresa_id=${empresaId}&_=${timestamp}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Error en la respuesta del servidor');
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         activoSelect.innerHTML = '<option value="">Seleccione un activo</option>';
                         
@@ -100,12 +113,14 @@
                         activoSelect.disabled = false;
                         
                         loadingActivos.classList.add('hidden');
+                        console.log('Activos cargados:', data);
                     })
                     .catch(error => {
                         console.error('Error al cargar los activos:', error);
                         activoSelect.innerHTML = '<option value="">Error al cargar activos</option>';
-                        activoSelect.disabled = false;
+                        activoSelect.disabled = true;
                         loadingActivos.classList.add('hidden');
+                        errorActivos.classList.remove('hidden');
                     });
             } else {
                 activoSelect.innerHTML = '<option value="">Seleccione primero una empresa</option>';
@@ -115,7 +130,14 @@
         
         empresaSelect.addEventListener('change', cargarActivos);
         
-        cargarActivos();
+        retryButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            cargarActivos();
+        });
+        
+        if (empresaSelect.value) {
+            cargarActivos();
+        }
         
         document.getElementById('ticket-form').addEventListener('submit', function(e) {
             let isValid = true;
