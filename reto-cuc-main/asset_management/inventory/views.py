@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from .decorators import admin_required, tecnico_required, cliente_required
 from django.contrib.auth import logout
+from django.contrib.auth import authenticate, login
 
 @login_required
 def inicio(request):
@@ -65,27 +66,32 @@ def inicio(request):
         return redirect('login')
 
 def login_view(request):
-    if request.session.get('is_logged_in'):
-        return redirect('inventory_list')
+    if request.user.is_authenticated:
+        return redirect('inicio')
+    
     if request.method == 'POST':
         form = LoginForm(request.POST)
         if form.is_valid():
             username = form.cleaned_data['username']
             password = form.cleaned_data['password']
-            if username and password: 
-                request.session['is_logged_in'] = True
-                messages.success(request, 'Logged in successfully.')
-                return redirect('inventory_list')
+            
+            user = authenticate(request, username=username, password=password)
+            
+            if user is not None:
+                login(request, user)
+                messages.success(request, 'Inicio de sesión exitoso.')
+                return redirect('inicio')
             else:
-                messages.error(request, 'Please enter valid username and password.')
+                messages.error(request, 'Usuario o contraseña incorrectos.')
+        else:
+            messages.error(request, 'Por favor, ingresa un usuario y contraseña válidos.')
     else:
         form = LoginForm()
+    
     return render(request, 'inventory/login.html', {'form': form})
 
+@login_required
 def inventory_list(request):
-    if not request.session.get('is_logged_in'):
-        messages.warning(request, 'Please log in to access the inventory.')
-        return redirect('login')
     return redirect('activos_por_empresa')
 
 @login_required
