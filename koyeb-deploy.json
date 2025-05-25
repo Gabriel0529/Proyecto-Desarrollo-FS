@@ -1,0 +1,30 @@
+{
+  "name": "asset-management",
+  "services": [
+    {
+      "name": "web",
+      "type": "web",
+      "build": {
+        "type": "docker"
+      },
+      "env": [
+        {
+          "key": "SECRET_KEY",
+          "value": "your-secret-key-here-change-this"
+        },
+        {
+          "key": "DEBUG",
+          "value": "False"
+        }
+      ],
+      "ports": [
+        {
+          "port": 8000,
+          "protocol": "http"
+        }
+      ],
+      "regions": ["fra"],
+      "instance_type": "nano"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+name: asset-management
+services:
+  - name: web
+    type: web
+    build:
+      type: docker
+    env:
+      - key: SECRET_KEY
+        value: your-secret-key-here
+      - key: DEBUG
+        value: "False"
+      - key: DATABASE_URL
+        value: ${{ koyeb.services.postgres.database_url }}
+    ports:
+      - port: 8000
+        protocol: http
+    regions:
+      - fra
+    instance_type: nano
+    
+  - name: postgres
+    type: database
+    database:
+      engine: postgresql
+      version: "15"
+    regions:
+      - fra
+    instance_type: nano
